@@ -62,7 +62,7 @@ arduino:avr    1.8.5   Arduino AVR Boards
 arduino:samd   1.8.13  Arduino SAMD Boards (32-bits ARM Cortex-M0+)
 ```
 
-* Install the two board toolchains:
+* Install the two board toolchains; wrist is ESP32, frontkick is nrf52:
 
 ```sh
 $ arduino-cli board install esp32:esp32
@@ -73,7 +73,15 @@ $ arduino-cli core install adafruit:nrf52
 
 ```bash
 $ arduino-cli lib install ArduinoJson GxEPD Adafruit_GFX_Library Adafruit_BusIO
+$ arduino-cli lib install "SparkFun u-blox GNSS Arduino Library" BME680 MicroNMEA
 ```
+
+* Linux-only; see https://learn.adafruit.com/introducing-the-adafruit-nrf52840-feather/update-bootloader-use-command-line 
+
+```
+$ pip3 install --user adafruit-nrfutil
+```
+Also on Linux, you must add ```$HOME/.local/bin``` to your ```$PATH```
 
 * If you are on a Linux platform, ensure your user is a member of the dialout group: 
 
@@ -98,4 +106,29 @@ WiFi                 2.0.0   /data/part0/users/riley/.arduino15/packages/esp32/h
 
 Used platform Version Path                                                                  
 esp32:esp32   2.0.5   /data/part0/users/riley/.arduino15/packages/esp32/hardware/esp32/2.0.5
+```
+
+```
+$ arduino-cli compile -b adafruit:nrf52:feather52840 frontkick
+```
+
+```
+Library Adafruit_nRFCrypto has been declared precompiled:
+Using precompiled library in /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/Adafruit_nRFCrypto/src/cortex-m4/fpv4-sp-d16-hard
+
+
+Used library                         Version Path                                                                                                        
+Wire                                 1.0     /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/Wire                    
+Bluefruit52Lib                       0.21.0  /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/Bluefruit52Lib          
+Adafruit_nRFCrypto                   0.0.5   /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/Adafruit_nRFCrypto      
+Adafruit_TinyUSB_Arduino             1.7.0   /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/Adafruit_TinyUSB_Arduino
+Adafruit_LittleFS                    0.11.0  /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/Adafruit_LittleFS       
+InternalFileSytem                    0.11.0  /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/InternalFileSytem       
+BME680                               1.0.10  /data/part0/users/riley/Arduino/libraries/BME680                                                            
+SPI                                  1.0     /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/SPI                     
+SparkFun_u-blox_GNSS_Arduino_Library 2.2.16  /data/part0/users/riley/Arduino/libraries/SparkFun_u-blox_GNSS_Arduino_Library                              
+MicroNMEA                            2.0.6   /data/part0/users/riley/Arduino/libraries/MicroNMEA                                                         
+
+Used platform  Version Path                                                                     
+adafruit:nrf52 1.3.0   /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0
 ```
