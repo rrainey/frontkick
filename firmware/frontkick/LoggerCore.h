@@ -25,7 +25,7 @@
  * Change History affecting sensor output and log file contents
  *
  * Version 57:
- *    Add estimated DZ ground altitude, expressed as both air pressure (hPa) and MSL altitude (feet) to $PVER
+ *    Add estimated DZ field elevation, expressed as both air pressure (hPa) and MSL altitude (feet) to $PVER
  *    Add NMEA-style checksums to all sentences
  *
  * Version 56:
