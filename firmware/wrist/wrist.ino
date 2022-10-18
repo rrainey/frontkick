@@ -686,7 +686,7 @@ bool loadConfiguration(const char *filename, AppConfig &config) {
 
   if (err != DeserializationError::Ok) {
     Serial.print(F("Can't load configuration file:"));
-    Serial.println(err.f_str());
+    Serial.println(err.c_str());
     return false;
   }
 
