@@ -65,15 +65,18 @@ arduino:samd   1.8.13  Arduino SAMD Boards (32-bits ARM Cortex-M0+)
 * Install the two board toolchains; wrist is ESP32, frontkick is nrf52:
 
 ```sh
-$ arduino-cli board install esp32:esp32
+$ arduino-cli core install esp32:esp32
 $ arduino-cli core install adafruit:nrf52
 ```
 
 * install these Arduino libraries: 
 
 ```bash
-$ arduino-cli lib install ArduinoJson GxEPD Adafruit_GFX_Library Adafruit_BusIO
-$ arduino-cli lib install "SparkFun u-blox GNSS Arduino Library" BME680 MicroNMEA
+$ arduino-cli lib install ArduinoJson
+$ arduino-cli lib install GxEPD
+$ arduino-cli lib install "SparkFun u-blox GNSS Arduino Library" 
+$ arduino-cli lib install BME680 
+$ arduino-cli lib install MicroNMEA
 ```
 
 * Linux-only; see https://learn.adafruit.com/introducing-the-adafruit-nrf52840-feather/update-bootloader-use-command-line 
