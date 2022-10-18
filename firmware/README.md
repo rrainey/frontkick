@@ -93,19 +93,19 @@ As of today, build results will look something like this:
 
 ```
 Used library         Version Path                                                                                            
-BluetoothSerial      2.0.0   /data/part0/users/riley/.arduino15/packages/esp32/hardware/esp32/2.0.5/libraries/BluetoothSerial
-ArduinoJson          6.19.4  /data/part0/users/riley/Arduino/libraries/ArduinoJson                                           
-SD                   2.0.0   /data/part0/users/riley/.arduino15/packages/esp32/hardware/esp32/2.0.5/libraries/SD             
-FS                   2.0.0   /data/part0/users/riley/.arduino15/packages/esp32/hardware/esp32/2.0.5/libraries/FS             
-SPI                  2.0.0   /data/part0/users/riley/.arduino15/packages/esp32/hardware/esp32/2.0.5/libraries/SPI            
-GxEPD                3.1.3   /data/part0/users/riley/Arduino/libraries/GxEPD                                                 
-Adafruit_GFX_Library 1.11.3  /data/part0/users/riley/Arduino/libraries/Adafruit_GFX_Library                                  
-Adafruit_BusIO       1.13.2  /data/part0/users/riley/Arduino/libraries/Adafruit_BusIO                                        
-Wire                 2.0.0   /data/part0/users/riley/.arduino15/packages/esp32/hardware/esp32/2.0.5/libraries/Wire           
-WiFi                 2.0.0   /data/part0/users/riley/.arduino15/packages/esp32/hardware/esp32/2.0.5/libraries/WiFi           
+BluetoothSerial      2.0.0   
+ArduinoJson          6.19.4                                            
+SD                   2.0.0              
+FS                   2.0.0               
+SPI                  2.0.0               
+GxEPD                3.1.3                                                    
+Adafruit_GFX_Library 1.11.3                                    
+Adafruit_BusIO       1.13.2                                          
+Wire                 2.0.0              
+WiFi                 2.0.0              
 
 Used platform Version Path                                                                  
-esp32:esp32   2.0.5   /data/part0/users/riley/.arduino15/packages/esp32/hardware/esp32/2.0.5
+esp32:esp32   2.0.5   
 ```
 
 ```
@@ -118,17 +118,17 @@ Using precompiled library in /data/part0/users/riley/.arduino15/packages/adafrui
 
 
 Used library                         Version Path                                                                                                        
-Wire                                 1.0     /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/Wire                    
-Bluefruit52Lib                       0.21.0  /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/Bluefruit52Lib          
-Adafruit_nRFCrypto                   0.0.5   /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/Adafruit_nRFCrypto      
-Adafruit_TinyUSB_Arduino             1.7.0   /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/Adafruit_TinyUSB_Arduino
-Adafruit_LittleFS                    0.11.0  /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/Adafruit_LittleFS       
-InternalFileSytem                    0.11.0  /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/InternalFileSytem       
-BME680                               1.0.10  /data/part0/users/riley/Arduino/libraries/BME680                                                            
-SPI                                  1.0     /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0/libraries/SPI                     
-SparkFun_u-blox_GNSS_Arduino_Library 2.2.16  /data/part0/users/riley/Arduino/libraries/SparkFun_u-blox_GNSS_Arduino_Library                              
-MicroNMEA                            2.0.6   /data/part0/users/riley/Arduino/libraries/MicroNMEA                                                         
+Wire                                 1.0                         
+Bluefruit52Lib                       0.21.0            
+Adafruit_nRFCrypto                   0.0.5         
+Adafruit_TinyUSB_Arduino             1.7.0   
+Adafruit_LittleFS                    0.11.0         
+InternalFileSytem                    0.11.0         
+BME680                               1.0.10                                                              
+SPI                                  1.0                          
+SparkFun_u-blox_GNSS_Arduino_Library 2.2.16                                
+MicroNMEA                            2.0.6                                                            
 
 Used platform  Version Path                                                                     
-adafruit:nrf52 1.3.0   /data/part0/users/riley/.arduino15/packages/adafruit/hardware/nrf52/1.3.0
+adafruit:nrf52 1.3.0   
 ```
