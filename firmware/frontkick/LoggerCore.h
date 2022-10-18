@@ -5,7 +5,6 @@
 //#include <Adafruit_DPS310.h>
 //#include <Adafruit_MPU6050.h>
 //#include <Adafruit_Sensor.h>
-//#include <Adafruit_TinyUSB.h>
 #include <Zanshin_BME680.h>
 // Library here: // see https://github.com/bolderflight/bmi088-arduino
 #include "./BMI088.h"
@@ -16,14 +15,18 @@
 #include <MicroNMEA.h> 
 #include <Print.h>
 
-#define APP_STRING  "Frontkick, version 0.56"
+#define APP_STRING  "Frontkick, version 0.57"
 #define LOG_VERSION 1
-#define NMEA_APP_STRING "$PVER,\"Frontkick, version 0.56\",56"
+#define NMEA_APP_STRING "$PVER,\"Frontkick, version 0.57\",57"
 
 /*
- * Last built with Arduino version 2.0.1
+ * Last built with Arduino IDE version 2.0.1; also builds with arduino-cli
  * 
  * Change History affecting sensor output and log file contents
+ *
+ * Version 57:
+ *    Add estimated DZ ground altitude, expressed as both air pressure (hPa) and MSL altitude (feet) to $PVER
+ *    Add NMEA-style checksums to all sentences
  *
  * Version 56:
  *    Add $PCLOS directive to direct the logging function to close a completed log file
@@ -32,7 +35,7 @@
  *    Disable NMEA satellite status sentences when in higher GNSS position polling rates
  *    
  * Version 54:
- *    5 Hz GNSS message rate when in freefall till landing.
+ *    Switch to 5 Hz GNSS message rate when in freefall till landing.
  * 
  * Version 53:
  *    u-blox Dynamic Platform Mode now set to Airborne 2g 
@@ -60,9 +63,12 @@
 #define OPS_GROUND_TEST   2  // for testing; uses GPS horizontal movement as an analogue to altitude changes
 
 /*
- * Set opertaing mode for this build of the firmware here
+ * Set operating mode for this build of the firmware here. If using arduino-cli to compile, we can
+ * define OPS_MODE on the command line to get a build suitable for integration testing.
  */
+#ifndef OPS_MODE
 #define OPS_MODE OPS_FLIGHT
+#endif
 
 #define TEST_SPEED_THRESHOLD_KTS     6.0
 #define OPS_HDOT_THRESHOLD_FPM       300
@@ -118,6 +124,14 @@
  * LiPoly battery is rated at 3.7V
  */
 #define LOWBATT_THRESHOLD 3.55
+
+/*
+ * The LoggerCore includes a simple subsystem used to estimate the field elevation at the dropzone.
+ * It does that by periodically taking an altitude reading when otherwise idle. (The sample period is
+ * associated with the battery monitor timer, which runs every 30 seconds).  When a flight up to altitude
+ * starts, the subsytem uses a reading from a few minutes back and reports that as the field elevation.
+ */
+#define NUM_ALT_SAMPLES 10
 
 class LoggerCore : public Print {
   public:
@@ -183,6 +197,10 @@ class LoggerCore : public Print {
 
     float m_fMeasuredBattery_volts;
 
+    int m_nCurAltitudeSample;
+    float m_fMeasuredPressure_hPa[NUM_ALT_SAMPLES];
+    int m_nMeaasuredAltitude_ftMSL[NUM_ALT_SAMPLES];
+
     int m_nBlinkState;
 
     /*
@@ -212,19 +230,19 @@ class LoggerCore : public Print {
     /*
      * Mark the start of a new jump log
      */
-    void StartLogStream() { 
-      println( NMEA_APP_STRING );
-      m_bLogActive = true;
-    };
+    void StartLogStream();
+
+    /// @brief Compute NMEA-style checksum and append it to the string
+    void AddNMEAChecksum(char *pszSentence, unsigned char *pszResult);
 
     void FlushLogStream() {};
     /*
      * Mark the end of a jump log
      */
-    void EndLogStream() { 
-      println( "$PCLOS" ); 
-      m_bLogActive = false;
-    };
+    void EndLogStream();
+
+    /// @brief Get logging status
+    /// @return returns true any time we are logging
     bool IsLogActive(void) {
       return m_bLogActive;
     }
@@ -232,6 +250,7 @@ class LoggerCore : public Print {
     void SetStreamConnectionState( bool bValue ) { m_bStreamConnected = bValue; }
     void StartLogFileFlushing() {};
 
+    /// @brief Sample air pressure, altitude, and log it if logging is active
     void SampleAndLogAltitude();
 
     uint32_t GetLogfileOriginMillis() const { return m_ulLogfileOriginMillis; }
@@ -242,7 +261,7 @@ class LoggerCore : public Print {
     void Shutdown();
 
     /*
-     * Intended to be overrriden in whatever class derives from LorrgerCore
+     * Intended to be overriden in whatever class derives from LoggerCore
      */
     size_t write(const uint8_t *buffer, size_t size) { return 0; };
     /*

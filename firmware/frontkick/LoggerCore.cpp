@@ -23,6 +23,23 @@ static bool g_bPrintNMEA = false;
 
 static LoggerCore * g_pLoggerCoreSingleton = NULL;
 
+float altitude(const int32_t press, const float seaLevel = 1013.25);
+float altitude(const int32_t press, const float seaLevel) {
+  /*!
+  @brief     This converts a pressure measurement into a height in meters
+  @details   The corrected sea-level pressure can be passed into the function if it is known,
+             otherwise the standard atmospheric pressure of 1013.25hPa is used (see
+             https://en.wikipedia.org/wiki/Atmospheric_pressure) for details.
+  @param[in] press    Pressure reading from BME680
+  @param[in] seaLevel Sea-Level pressure in millibars
+  @return    floating point altitude in meters.
+  */
+  static float Altitude;
+  Altitude =
+      44330.0 * (1.0 - pow(((float)press / 100.0) / seaLevel, 0.1903));
+  return (Altitude);
+} 
+
 /**
  * see https://learn.adafruit.com/bluefruit-nrf52-feather-learning-guide/nrf52-adc
  */
@@ -70,6 +87,8 @@ LoggerCore::LoggerCore() {
   m_timer4_ms = 0;
   m_bTimer5Active = false;
   m_timer5_ms = 0;
+
+  m_nCurAltitudeSample = 0;
 
   m_nH_feet = 0;
   m_nHDot_fpm = 0;
@@ -170,6 +189,50 @@ void LoggerCore::Initialize() {
 
 }
 
+void LoggerCore::EndLogStream() {
+  char szBuffer[128];
+  unsigned char ucChecksum;
+
+  sprintf( szBuffer, "$PCLOS" );
+  AddNMEAChecksum( szBuffer, &ucChecksum );
+  println( szBuffer );
+
+  m_bLogActive = false;
+};
+
+void LoggerCore::StartLogStream() { 
+      /*
+      print( NMEA_APP_STRING );
+      m_bLogActive = true;
+
+      // use altitude sample from two minutes back
+      int nSample = m_nCurAltitudeSample - 4;
+      if (nSample < 0) {
+        nSample += NUM_ALT_SAMPLES;
+      }
+      print( "," );
+      print( m_fMeasuredPressure_hPa[nSample] );
+      print( "," );
+      println( m_nMeaasuredAltitude_ftMSL[nSample] );
+      */
+
+      m_bLogActive = true;
+
+      // use altitude sample from two minutes back
+      int nSample = m_nCurAltitudeSample - 4;
+      if (nSample < 0) {
+        nSample += NUM_ALT_SAMPLES;
+      }
+
+      char szBuffer[128];
+      unsigned char ucChecksum;
+
+      sprintf( szBuffer, "%s,%.3f,%d", NMEA_APP_STRING, 
+               m_fMeasuredPressure_hPa[nSample], m_nMeaasuredAltitude_ftMSL[nSample] );
+      AddNMEAChecksum( szBuffer, &ucChecksum );
+      println( szBuffer );
+    };
+
 void LoggerCore::Loop() {
 
   uint32_t curTime_ms = millis();
@@ -256,6 +319,23 @@ void LoggerCore::Loop() {
     m_timer2_ms = TIMER2_INTERVAL_MS;
     
     m_fMeasuredBattery_volts = readVBAT();
+
+    if (m_nCurAltitudeSample++ == NUM_ALT_SAMPLES) {
+      m_nCurAltitudeSample = 0;
+    }
+
+    /*
+     *  Maintain a history of altitude samples. This is used to have an estimate of the
+     *  MSL altitude corresponding to ground level.  The Bosch data sheet for the BME088
+     *  indicates that the altitude margin for error is +/-3.2 ft (+/-1 meter).
+     */
+    int32_t  temp, humidity, pressure, gas; 
+
+    m_bme680.getSensorData( temp, humidity, pressure, gas );
+    // Reported values do not take into account how high off the ground the unit is
+    // positioned when sampling (likely at least chest height)
+    m_fMeasuredPressure_hPa[m_nCurAltitudeSample] = pressure;
+    m_nMeaasuredAltitude_ftMSL[m_nCurAltitudeSample] = (int) (altitude(pressure) * 3.28084f);
 
     if ( m_fMeasuredBattery_volts <= LOWBATT_THRESHOLD ) {
       m_bBatteryAlarm = true;
@@ -418,8 +498,12 @@ void SFE_UBLOX_GNSS::processNMEA(char incoming)
        * designed to allow us to correlate GPS time and millis() time in the output stream.
        */
       if (strncmp( incomingNMEA+3, "GGA", 3) == 0 || strncmp( incomingNMEA+3, "GLL", 3) == 0) {
-        g_pLoggerCoreSingleton->print( "$PTH," );
-        g_pLoggerCoreSingleton->println( lastNMEATime_ms );
+        char szBuffer[128];
+        unsigned char ucChecksum;
+
+        sprintf( szBuffer, "$PTH,%u", millis() - g_pLoggerCoreSingleton->GetLogfileOriginMillis() );
+        g_pLoggerCoreSingleton->AddNMEAChecksum( szBuffer, &ucChecksum );
+        g_pLoggerCoreSingleton->println( szBuffer );
       }
       
       g_pLoggerCoreSingleton->FlushLogStream();
@@ -456,6 +540,7 @@ void LoggerCore::SampleIMU() {
 #endif
   
     if (IsLogActive()) {
+      /*
       print("$PIMU,");
       print(millis() - m_ulLogfileOriginMillis);
       
@@ -473,26 +558,18 @@ void LoggerCore::SampleIMU() {
       print(",");
       print(gz);
       println();
+      */
+
+      char szBuffer[128];
+      unsigned char ucChecksum;
+
+      sprintf( szBuffer, "$PIMU,%u,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f",
+               millis() - m_ulLogfileOriginMillis, ax, ay, az, gx, gy, gz );
+      AddNMEAChecksum( szBuffer, &ucChecksum );
+      println( szBuffer );
     }
   }
 }
-
-float altitude(const int32_t press, const float seaLevel = 1013.25);
-float altitude(const int32_t press, const float seaLevel) {
-  /*!
-  @brief     This converts a pressure measurement into a height in meters
-  @details   The corrected sea-level pressure can be passed into the function if it is known,
-             otherwise the standard atmospheric pressure of 1013.25hPa is used (see
-             https://en.wikipedia.org/wiki/Atmospheric_pressure) for details.
-  @param[in] press    Pressure reading from BME680
-  @param[in] seaLevel Sea-Level pressure in millibars
-  @return    floating point altitude in meters.
-  */
-  static float Altitude;
-  Altitude =
-      44330.0 * (1.0 - pow(((float)press / 100.0) / seaLevel, 0.1903));  // Convert into meters
-  return (Altitude);
-} 
 
 void LoggerCore::SampleAndLogAltitude()
 {
@@ -609,7 +686,7 @@ void LoggerCore::SampleAndLogAltitude()
      * Output a record
      */
     if (m_nAppState != STATE_WAIT) {
-        
+      /*
       print("$PENV,");
       print(millis() - m_ulLogfileOriginMillis);
       print(",");
@@ -618,6 +695,15 @@ void LoggerCore::SampleAndLogAltitude()
       print( dAlt_ft );
       print(",");
       println(m_fMeasuredBattery_volts);
+      */
+
+      char szBuffer[128];
+      unsigned char ucChecksum;
+
+      sprintf( szBuffer, "$PENV,%u,%.3f,%.1g,%.3f",
+               millis() - m_ulLogfileOriginMillis, fPressure_hPa, dAlt_ft, m_fMeasuredBattery_volts );
+      AddNMEAChecksum( szBuffer, &ucChecksum );
+      println( szBuffer );
     
     }
     else {
@@ -654,7 +740,7 @@ void LoggerCore::updateHDot(float H_feet) {
 
   /* update HDot every ten seconds */
   if (nInterval_ms > 10000) {
-    if (!m_bFirstPressureSample) {
+    if (m_bFirstPressureSample == false) {
       if (m_nNextHSample == 0) {
         nLastHSample_feet = m_nHSample[NUM_H_SAMPLES-1];
       }
@@ -724,3 +810,16 @@ void LoggerCore::SetBlinkState( int newState ) {
   m_nBlinkState = newState;
   digitalWrite( RED_LED, m_redLEDState );
 }
+
+void LoggerCore::AddNMEAChecksum(char *pszSentence, unsigned char *pucResult) {
+  unsigned char ucChecksum = 0;
+  char * p = pszSentence + 1; // skip leading '$'
+  while (*p) {
+    unsigned char ucByte = (unsigned char) *p++;
+    ucChecksum ^= ucByte;
+  }
+  // append NMEA representation of checksum to the senntence '*XX'
+  sprintf(p, "*%02x", (int) ucChecksum);
+  *pucResult = ucChecksum;
+}
+
