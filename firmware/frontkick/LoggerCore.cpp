@@ -111,6 +111,13 @@ LoggerCore::LoggerCore() {
 void LoggerCore::Initialize() {
   int status;
 
+  if (OPS_MODE == OPS_FLIGHT) {
+    Serial.println("Starting in OPS_FLIGHT mode.");
+  }
+  else if (OPS_MODE == OPS_STATIC_TEST) {
+    Serial.println("Starting in OPS_STATIC_TEST mode.");
+  }
+
   pinMode(RED_LED, OUTPUT);
   m_redLEDState = LOW;
   digitalWrite(RED_LED, m_redLEDState);
@@ -119,20 +126,32 @@ void LoggerCore::Initialize() {
   m_nBlinkState = BLINK_STATE_OFF;
 
   if (m_bmi088.isConnection()) {
-    /*
+    
+    // Powerdown is required to perform an I2C soft reset
+    m_bmi088.setAccPoweMode(ACC_SUSPEND);
+    m_bmi088.setGyroPoweMode(GYRO_DEEP_SUSPEND);
+
+    // Soft reset
+    delay(5);
     m_bmi088.resetAcc();
     delay(5);
     m_bmi088.resetGyro();
-    delay(5);
-    */
-    m_bmi088.initialize();
-    m_bmi088.setAccOutputDataRate(ODR_50);
+    delay(60);
+
+    // power back up
+    m_bmi088.setAccPoweMode(ACC_ACTIVE);
+    m_bmi088.setGyroPoweMode(GYRO_NORMAL);
+    delay(100);
+
+    // initilize for normal operation
+    m_bmi088.initialize(ODR_100, ODR_100_BW_32);
+
+    Serial.println("IMU Initialized");
+
   }
   else {
     Serial.println("BMI088 is not connected");
   }
-
-  Serial.println("IMU Initialized");
 
   //pNMEA = incomingNMEA;
 
@@ -143,6 +162,8 @@ void LoggerCore::Initialize() {
 
   Serial.println(F("GNSS Detected"));
 
+  m_GNSS.setHighPrecisionMode(true);
+
   // Disable unused output channels
   
   m_GNSS.setUART1Output(0);
@@ -150,7 +171,9 @@ void LoggerCore::Initialize() {
 
   //m_GNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_NMEA); //Set the I2C port to output both NMEA and UBX messages
   m_GNSS.setI2COutput(COM_TYPE_NMEA);
-  m_GNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save (only) the communications port settings to flash and BBR
+
+  m_GNSS.disableNMEAMessage( UBX_NMEA_GSA, COM_PORT_I2C );
+  m_GNSS.disableNMEAMessage( UBX_NMEA_GSV, COM_PORT_I2C );
 
   // Idle reporting will be at 0.5 Hz
   m_GNSS.setMeasurementRate(2000);
@@ -170,22 +193,23 @@ void LoggerCore::Initialize() {
 
   m_GNSS.setNavigationFrequency(1);
 
+  m_GNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save (only) the communications port settings to flash and BBR
+
   m_bIMUPresent = true;
 
-
   while (!m_bme680.begin(I2C_FAST_MODE)) {
-    Serial.print(F("-  Unable to find m_bme680. Trying again in 5 seconds.\n"));
-    delay(5000);
-  }  // of loop until device is located
-  Serial.print(F("- Setting 16x oversampling for all sensors\n"));
-  delay(200);
-  m_bme680.setOversampling(TemperatureSensor, Oversample16);  // Use enumerated type values
-  m_bme680.setOversampling(HumiditySensor, Oversample16);     // Use enumerated type values
-  m_bme680.setOversampling(PressureSensor, Oversample16);     // Use enumerated type values
-  Serial.print(F("- Setting IIR filter to a value of 4 samples\n"));
-  m_bme680.setIIRFilter(IIR4);  // Use enumerated type values
-  Serial.print(F("- Setting gas measurement to 320\xC2\xB0\x43 for 150ms\n"));
-  m_bme680.setGas(320, 150);  // 320�c for 150 milliseconds
+    Serial.println(F("-  Unable to find m_bme680. Trying again in 5 seconds."));
+    delay(1000);
+  } 
+  Serial.println(F("BME680 - Setting 16x oversampling for all sensors"));
+  delay(100);
+  m_bme680.setOversampling(TemperatureSensor, Oversample16);  
+  m_bme680.setOversampling(HumiditySensor, Oversample16);     
+  m_bme680.setOversampling(PressureSensor, Oversample16);     
+  Serial.println(F("- Setting IIR filter to a value of 4 samples"));
+  m_bme680.setIIRFilter(IIR4);  
+  Serial.println(F("- Disabling gas measurement/heater"));
+  m_bme680.setGas(0, 0);  
 
 }
 
@@ -383,6 +407,9 @@ void LoggerCore::updateStateMachine() {
 
       StartLogStream();
 
+      m_GNSS.disableNMEAMessage( UBX_NMEA_GSA, COM_PORT_I2C );
+      m_GNSS.disableNMEAMessage( UBX_NMEA_GSV, COM_PORT_I2C );
+
       // Activate altitude / battery sensor logging
       m_bTimer4Active = true;
       m_timer4_ms = TIMER4_INTERVAL_MS;
@@ -395,6 +422,9 @@ void LoggerCore::updateStateMachine() {
 
       // Set "time 0" for log file.
       m_ulLogfileOriginMillis = millis();
+
+      // Put IMU in FIFO Mode
+      initializeIMUSampling();
       
       m_nAppState = STATE_IN_FLIGHT;
     }
@@ -449,6 +479,10 @@ void LoggerCore::updateStateMachine() {
         m_GNSS.enableNMEAMessage (UBX_NMEA_GSV, COM_PORT_I2C );
         
         m_bTimer4Active = false;
+
+        // Shutdown IMU FIFO
+        initializeIMUSampling();
+
         Serial.println("Switching to STATE_WAIT");
         SetBlinkState ( BLINK_STATE_OFF );
         m_nAppState = STATE_WAIT;
@@ -522,13 +556,9 @@ void LoggerCore::SampleIMU() {
 
   float ax = 0, ay = 0, az = 0;
   float gx = 0, gy = 0, gz = 0;
-  int16_t nTemp = 0;
+  //float fTemp_C;
 
   if (m_bIMUPresent) {
-
-    m_bmi088.getAcceleration(&ax, &ay, &az);
-    m_bmi088.getGyroscope(&gx, &gy, &gz);
-    nTemp = m_bmi088.getTemperature();
 
 #ifdef notdef
     Serial.print(g.gyro.x); // rad per sec
@@ -560,13 +590,58 @@ void LoggerCore::SampleIMU() {
       println();
       */
 
-      char szBuffer[128];
-      unsigned char ucChecksum;
+     // Pull sample data from FIFO's into queues
+      int nAccCount = m_bmi088.updateAccQueue();
+      int nGyroCount = m_bmi088.updateGyroQueue();
 
-      sprintf( szBuffer, "$PIMU,%u,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f",
-               millis() - m_ulLogfileOriginMillis, ax, ay, az, gx, gy, gz );
-      AddNMEAChecksum( szBuffer, &ucChecksum );
-      println( szBuffer );
+      if (nGyroCount > 1 && nAccCount > 1) {
+        Serial.println("More than expected impbalance in Acc/Gyro queues");
+      }
+
+      while (nAccCount > 0 && nGyroCount > 0) {
+
+        if (! m_bmi088.popAccelerationSampleFromQueue(&ax, &ay, &az) ) {
+          // assertion error
+        }
+
+        if (! m_bmi088.popGyroscopeSampleFromQueue(&gx, &gy, &gz) ) {
+          // assertion error
+        }
+
+        //fTemp_C = m_bmi088.getTemperature();
+
+        char szBuffer[128];
+        unsigned char ucChecksum;
+
+        // todo: generate an estimated time based on how far back in time this estimate is based on
+        // how many entries are left in the queues ...
+        sprintf( szBuffer, "$PIMU,%u,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f",
+                millis() - m_ulLogfileOriginMillis,
+                MGtoMPS(ax), MGtoMPS(ay), MGtoMPS(az), 
+                DEGtoRAD(gx), DEGtoRAD(gy), DEGtoRAD(gz) );
+        AddNMEAChecksum( szBuffer, &ucChecksum );
+        println( szBuffer );
+
+        -- nAccCount;
+        -- nGyroCount;
+      }
+
+      // Sample rate mismatch mitigation
+      //
+      // During testing, I found that the 100Hz sample rates for the acc/gyro were not quite in sync.
+      // In fact, the accerometer would consistently generate a few more samples over a long interval 
+      // (12072 acc vs. 12024 gyro over 120 seconds in my experiments)
+      //
+      // So, either nAccCount or nGyroCount is zero when we get to here. If more than two samples are left
+      // in the other queue, drain that queue down to 1 entry to keep them more or less synchronized
+
+      while (nAccCount -- > 1) {
+        m_bmi088.popAccelerationSampleFromQueue(&ax, &ay, &az);
+      }
+      while (nGyroCount-- > 1) {
+        m_bmi088.popGyroscopeSampleFromQueue(&gx, &gy, &gz);
+      }
+
     }
   }
 }
@@ -700,7 +775,7 @@ void LoggerCore::SampleAndLogAltitude()
       char szBuffer[128];
       unsigned char ucChecksum;
 
-      sprintf( szBuffer, "$PENV,%u,%.3f,%.1g,%.3f",
+      sprintf( szBuffer, "$PENV,%u,%.3f,%.1f,%.3f",
                millis() - m_ulLogfileOriginMillis, fPressure_hPa, dAlt_ft, m_fMeasuredBattery_volts );
       AddNMEAChecksum( szBuffer, &ucChecksum );
       println( szBuffer );
@@ -819,7 +894,24 @@ void LoggerCore::AddNMEAChecksum(char *pszSentence, unsigned char *pucResult) {
     ucChecksum ^= ucByte;
   }
   // append NMEA representation of checksum to the senntence '*XX'
-  sprintf(p, "*%02x", (int) ucChecksum);
+  sprintf(p, "*%02X", (int) ucChecksum);
   *pucResult = ucChecksum;
+}
+
+void LoggerCore::initializeIMUSampling() {
+  // Switch to FIFO sampling for both ACC and GYRO
+  m_bmi088.setAccFifoMode(ACC_FIFO_MODE_FIFO, true, true, false);
+  m_bmi088.setGyroFifoMode(0, GYRO_FIFO_MODE_FIFO);
+
+  m_bmi088.setAccScaleRange( RANGE_6G );
+  m_bmi088.setGyroScaleRange( RANGE_250 );
+
+  // let BMI088 settle into new operating modes (from manual 4.6.1 - > 50ms)
+  delay(55);
+}
+    
+void LoggerCore::shutdownIMUSampling() {
+  m_bmi088.setAccFifoMode(ACC_FIFO_MODE_STREAM, false, false, false);
+  m_bmi088.setGyroFifoMode(0, GYRO_FIFO_MODE_STREAM);
 }
 

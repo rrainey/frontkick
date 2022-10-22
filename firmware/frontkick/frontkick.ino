@@ -28,8 +28,8 @@ class FrontLogger : public LoggerCore {
     FrontLogger() {};
 
     /**
-     * write() is the only method which must be overrridden - this
-     * directs all logstream output to the appropriate desitination -
+     * write() is the only method which must be overridden - this
+     * directs all logstream output to the appropriate destination -
      * the Bluetooth UART stream, in this case.
      */
     size_t write(const uint8_t *buffer, size_t size) {
@@ -40,8 +40,19 @@ class FrontLogger : public LoggerCore {
 
 FrontLogger sensors;
 
+char szUniqueName[64];
+
+char * getUniqueName() {
+  strncpy(szUniqueName, "Frontkick sensor pack ", sizeof(szUniqueName));
+  const char *p = getMcuUniqueID();
+  strncat(szUniqueName, p+12, 8);
+  return szUniqueName;
+}
+
 void setup()
 {
+  unsigned long ulStart_ms = millis();
+
   Serial.begin(115200);
 
   Wire.begin();
@@ -49,7 +60,7 @@ void setup()
 
 #if 1
   // Blocking wait for connection when debug mode is enabled via IDE
-  while ( !Serial ) yield();
+  while ( !Serial && ((millis() - ulStart_ms) < 10000)) { delay(5); yield(); };
 #endif
   
   Serial.println("Frontkick booting");
@@ -67,7 +78,7 @@ void setup()
 
   Bluefruit.begin();
   Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
-  Bluefruit.setName(getMcuUniqueID());
+  Bluefruit.setName( getUniqueName() );
   Bluefruit.Periph.setConnectCallback(connect_callback);
   Bluefruit.Periph.setDisconnectCallback(disconnect_callback);
 

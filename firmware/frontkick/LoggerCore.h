@@ -15,6 +15,17 @@
 #include <MicroNMEA.h> 
 #include <Print.h>
 
+#ifndef M_PI
+const double M_PI   = 3.14159265358979323846;
+const double M_PI_2 = 1.57079632679489661923;
+const double M_PI_4 = 0.78539816339744830962;
+#endif
+
+#if !defined (DEGtoRAD)
+#define DEGtoRAD(theta) ((theta) * M_PI / 180.0)
+#define RADtoDEG(theta) ((theta) * 180.0 / M_PI)
+#endif
+
 #define APP_STRING  "Frontkick, version 0.57"
 #define LOG_VERSION 1
 #define NMEA_APP_STRING "$PVER,\"Frontkick, version 0.57\",57"
@@ -67,7 +78,7 @@
  * define OPS_MODE on the command line to get a build suitable for integration testing.
  */
 #ifndef OPS_MODE
-#define OPS_MODE OPS_FLIGHT
+#define OPS_MODE OPS_FLIGHT 
 #endif
 
 #define TEST_SPEED_THRESHOLD_KTS     6.0
@@ -102,7 +113,7 @@
 #define TIMER3_OFF_INTERVAL_1_MS  750 // off interval when signaling battery low
 #define TIMER3_OFF_INTERVAL_2_MS  (3000 - TIMER3_ON_INTERVAL_MS) // off interval for flight mode
 
-#define TIMER4_INTERVAL_MS 20  // 50Hz BMI088 data rate used here
+#define TIMER4_INTERVAL_MS 10         // 100Hz BMI088 data rate used here
 
 #define TIMER5_INTERVAL_MS 10000
 
@@ -259,6 +270,10 @@ class LoggerCore : public Print {
     void Initialize();
     void Loop();
     void Shutdown();
+
+    void initializeIMUSampling();
+
+    void shutdownIMUSampling();
 
     /*
      * Intended to be overriden in whatever class derives from LoggerCore
