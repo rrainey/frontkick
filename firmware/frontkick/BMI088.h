@@ -47,7 +47,7 @@
 #include <Wire.h>
 
 // mg to meters per second (unsure of the value Bosch uses for calibration)
-#define MGtoMPS(x) ((x)*9.80665f)
+#define MGtoMPS(x) ((x)*0.00980665f)
 
 #define BMI088_ACC_ADDRESS          0x18  
 

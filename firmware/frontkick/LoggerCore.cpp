@@ -47,6 +47,8 @@ static float readVBAT(void) {
 
   float raw;
 
+  /*
+
   // Set the analog reference to 3.0V (default = 3.6V)
   analogReference(AR_INTERNAL_3_0);
 
@@ -67,6 +69,14 @@ static float readVBAT(void) {
   // divider into account (providing the actual LIPO voltage)
   // ADC range is 0..3000mV and resolution is 12-bit (0..4095)
   return raw * REAL_VBAT_MV_PER_LSB;
+  */
+
+  // See https://learn.adafruit.com/bluefruit-nrf52-feather-learning-guide/power-management
+  float measuredvbat = analogRead(A6);
+  measuredvbat *= 2;    // we divided by 2, so multiply back
+  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+  measuredvbat /= 1024; // convert to voltage
+  return measuredvbat;
 }
 
 LoggerCore::LoggerCore() {
@@ -552,6 +562,8 @@ void SFE_UBLOX_GNSS::processNMEA(char incoming)
   }
 }
 
+unsigned short g_bEvery = 0;
+
 void LoggerCore::SampleIMU() {
 
   float ax = 0, ay = 0, az = 0;
@@ -566,10 +578,6 @@ void LoggerCore::SampleIMU() {
       int nAccCount = m_bmi088.updateAccQueue();
       int nGyroCount = m_bmi088.updateGyroQueue();
 
-      if (nGyroCount > 1 && nAccCount > 1) {
-        Serial.println("More than expected imbalance in Acc/Gyro queues");
-      }
-
       // While there are data in both acc and gyro queues, build and send a sample record
       while (nAccCount > 0 && nGyroCount > 0) {
 
@@ -583,17 +591,23 @@ void LoggerCore::SampleIMU() {
 
         //fTemp_C = m_bmi088.getTemperature();
 
-        char szBuffer[256];
-        unsigned char ucChecksum;
 
-        // todo: generate an estimated time based on how far back in time this sample is based on
-        // how many entries are left in the queues ...
-        sprintf( szBuffer, "$PIMU,%u,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f",
-                millis() - m_ulLogfileOriginMillis,
-                MGtoMPS(ax), MGtoMPS(ay), MGtoMPS(az), 
-                DEGtoRAD(gx), DEGtoRAD(gy), DEGtoRAD(gz) );
-        AddNMEAChecksum( szBuffer, &ucChecksum );
-        println( szBuffer );
+        if (g_bEvery % 4 == 0) {
+          
+          char szBuffer[256];
+          unsigned char ucChecksum;
+
+          // todo: generate an estimated time based on how far back in time this sample is based on
+          // how many entries are left in the queues ...
+          sprintf( szBuffer, "$PIMU,%u,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f",
+                  millis() - m_ulLogfileOriginMillis,
+                  MGtoMPS(ax), MGtoMPS(ay), MGtoMPS(az), 
+                  DEGtoRAD(gx), DEGtoRAD(gy), DEGtoRAD(gz) );
+          AddNMEAChecksum( szBuffer, &ucChecksum );
+          println( szBuffer );
+        }
+
+        g_bEvery ++;
 
         -- nAccCount;
         -- nGyroCount;
@@ -610,12 +624,12 @@ void LoggerCore::SampleIMU() {
 
       while (nAccCount > 1) {
         m_bmi088.popAccelerationSampleFromQueue(&ax, &ay, &az);
-        Serial.println("popping imbalanced Acc");
+        //Serial.println("popping imbalanced Acc");
         nAccCount --;
       }
       while (nGyroCount > 1) {
         m_bmi088.popGyroscopeSampleFromQueue(&gx, &gy, &gz);
-        Serial.println("popping imbalanced Gyro");
+        //Serial.println("popping imbalanced Gyro");
         nGyroCount --;
       }
 

@@ -116,7 +116,7 @@ const double M_PI_4 = 0.78539816339744830962;
 #define TIMER3_OFF_INTERVAL_1_MS  750 // off interval when signaling battery low
 #define TIMER3_OFF_INTERVAL_2_MS  (3000 - TIMER3_ON_INTERVAL_MS) // off interval for flight mode
 
-#define TIMER4_INTERVAL_MS 10         // 100Hz BMI088 data rate used here
+#define TIMER4_INTERVAL_MS 5         // 100Hz BMI088 data rate used here; poll FIFOs at 200Hz
 
 #define TIMER5_INTERVAL_MS 10000
 
