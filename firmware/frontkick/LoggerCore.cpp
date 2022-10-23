@@ -481,7 +481,7 @@ void LoggerCore::updateStateMachine() {
         m_bTimer4Active = false;
 
         // Shutdown IMU FIFO
-        initializeIMUSampling();
+        shutdownIMUSampling();
 
         Serial.println("Switching to STATE_WAIT");
         SetBlinkState ( BLINK_STATE_OFF );
@@ -559,61 +559,34 @@ void LoggerCore::SampleIMU() {
   //float fTemp_C;
 
   if (m_bIMUPresent) {
-
-#ifdef notdef
-    Serial.print(g.gyro.x); // rad per sec
-    Serial.print(",");
-    Serial.print(g.gyro.y);
-    Serial.print(",");
-    Serial.print(g.gyro.z);
-    Serial.println();
-#endif
   
     if (IsLogActive()) {
-      /*
-      print("$PIMU,");
-      print(millis() - m_ulLogfileOriginMillis);
-      
-      print(",");
-      print(ax);  // m/s^2
-      print(",");
-      print(ay);
-      print(",");
-      print(az);
-      
-      print(",");
-      print(gx); // rad per sec
-      print(",");
-      print(gy);
-      print(",");
-      print(gz);
-      println();
-      */
 
-     // Pull sample data from FIFO's into queues
+      // Pull sample data from FIFOs into queues
       int nAccCount = m_bmi088.updateAccQueue();
       int nGyroCount = m_bmi088.updateGyroQueue();
 
       if (nGyroCount > 1 && nAccCount > 1) {
-        Serial.println("More than expected impbalance in Acc/Gyro queues");
+        Serial.println("More than expected imbalance in Acc/Gyro queues");
       }
 
+      // While there are data in both acc and gyro queues, build and send a sample record
       while (nAccCount > 0 && nGyroCount > 0) {
 
         if (! m_bmi088.popAccelerationSampleFromQueue(&ax, &ay, &az) ) {
-          // assertion error
+          Serial.println("Assertion: no entry in the acc queue");
         }
 
         if (! m_bmi088.popGyroscopeSampleFromQueue(&gx, &gy, &gz) ) {
-          // assertion error
+          Serial.println("Assertion: no entry in the gyro queue");
         }
 
         //fTemp_C = m_bmi088.getTemperature();
 
-        char szBuffer[128];
+        char szBuffer[256];
         unsigned char ucChecksum;
 
-        // todo: generate an estimated time based on how far back in time this estimate is based on
+        // todo: generate an estimated time based on how far back in time this sample is based on
         // how many entries are left in the queues ...
         sprintf( szBuffer, "$PIMU,%u,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f",
                 millis() - m_ulLogfileOriginMillis,
@@ -635,11 +608,15 @@ void LoggerCore::SampleIMU() {
       // So, either nAccCount or nGyroCount is zero when we get to here. If more than two samples are left
       // in the other queue, drain that queue down to 1 entry to keep them more or less synchronized
 
-      while (nAccCount -- > 1) {
+      while (nAccCount > 1) {
         m_bmi088.popAccelerationSampleFromQueue(&ax, &ay, &az);
+        Serial.println("popping imbalanced Acc");
+        nAccCount --;
       }
-      while (nGyroCount-- > 1) {
+      while (nGyroCount > 1) {
         m_bmi088.popGyroscopeSampleFromQueue(&gx, &gy, &gz);
+        Serial.println("popping imbalanced Gyro");
+        nGyroCount --;
       }
 
     }
@@ -655,20 +632,6 @@ void LoggerCore::SampleAndLogAltitude()
   m_bme680.getSensorData(temp, humidity, pressure, gas);
 
   fPressure_hPa = pressure;
-    
-  //sensors_event_t temp_event, pressure_event;
-
-  //if (dps.temperatureAvailable()) {
-  //  dps_temp->getEvent(&temp_event);
-    
-    /*
-    Serial.print(F("Temperature = "));
-    Serial.print(temp_event.temperature);
-    Serial.println(" *C");
-    Serial.println();
-    */
-    
-  //}
 
   /*
    * Note: sampling pressure in dps also samples temperature.
@@ -761,21 +724,11 @@ void LoggerCore::SampleAndLogAltitude()
      * Output a record
      */
     if (m_nAppState != STATE_WAIT) {
-      /*
-      print("$PENV,");
-      print(millis() - m_ulLogfileOriginMillis);
-      print(",");
-      print(fPressure_hPa);
-      print(",");
-      print( dAlt_ft );
-      print(",");
-      println(m_fMeasuredBattery_volts);
-      */
 
       char szBuffer[128];
       unsigned char ucChecksum;
 
-      sprintf( szBuffer, "$PENV,%u,%.3f,%.1f,%.3f",
+      sprintf( szBuffer, "$PENV,%u,%.2f,%.1f,%.2f",
                millis() - m_ulLogfileOriginMillis, fPressure_hPa, dAlt_ft, m_fMeasuredBattery_volts );
       AddNMEAChecksum( szBuffer, &ucChecksum );
       println( szBuffer );
@@ -913,5 +866,10 @@ void LoggerCore::initializeIMUSampling() {
 void LoggerCore::shutdownIMUSampling() {
   m_bmi088.setAccFifoMode(ACC_FIFO_MODE_STREAM, false, false, false);
   m_bmi088.setGyroFifoMode(0, GYRO_FIFO_MODE_STREAM);
+
+  int i;
+  for (i=0; i<7;++i) {
+   Serial.println(m_bmi088.m_ulFIFOBuckets[i]);
+  }
 }
 

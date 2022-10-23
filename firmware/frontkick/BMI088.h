@@ -40,7 +40,10 @@
 #ifndef __BOSCH_BMI088_H__
 #define __BOSCH_BMI088_H__
 
+#define SERIAL_BUFFER_SIZE 512
+
 #include <Arduino.h>
+
 #include <Wire.h>
 
 // mg to meters per second (unsure of the value Bosch uses for calibration)
@@ -206,7 +209,7 @@ typedef struct _BMISample {
 ///@brief size of processed FIFO sample queue; must be large enough to take all entries from the FIFO expected in one loop()
 ///       so, the size required will be dependent on both the BMI sample rate and the rate that loop() is invoked.
 #ifndef SAMPLE_QUEUE_SIZE
-#define SAMPLE_QUEUE_SIZE   32
+#define SAMPLE_QUEUE_SIZE   50
 #endif
 
 /// @brief An intermediate queue for storing samples from the BMI FIFO in a more structured manner.
@@ -221,7 +224,7 @@ class BMISampleQueue {
         bool isFull() const;
 
         /// @brief number of elements in the queue
-        int size() const;
+        unsigned short size() const;
 
         /// @brief remove all entries from the queue
         void clear();
@@ -237,8 +240,8 @@ class BMISampleQueue {
 
     protected:
         BMISample m_q[SAMPLE_QUEUE_SIZE];
-        short m_nFront;
-        short m_nBack;
+        unsigned short m_nFront;
+        unsigned short m_nBack;
 };
 
 class BMI088 {

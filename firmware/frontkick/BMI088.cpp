@@ -510,17 +510,27 @@ int BMI088::updateAccQueue(void) {
 
   int n;
   int m, m1;
-  unsigned char ucBuf[128], *p, prefix;
-  char szMessage[100];
+  unsigned char ucBuf[SERIAL_BUFFER_SIZE], *p, prefix;
+  //char szMessage[100];
 
   n = getAccFifoLength();
 
-  Wire.beginTransmission(BMI088_ACC_ADDRESS);
+  if (n > SERIAL_BUFFER_SIZE) {
+    Serial.println("warning: Wire buffer too small for available acc FIFO");
+    delay(5);
+  }
+
+  if (n == 0) {
+    return m_accQueue.size();
+  }
+
+  Wire.beginTransmission(devAddrAcc);
   Wire.write(BMI088_ACC_FIFO_DATA);
   Wire.endTransmission();
 
-  Wire.requestFrom(BMI088_ACC_ADDRESS, n);
+  Wire.requestFrom(devAddrAcc, n);
   m = m1 = Wire.available();
+
   p = ucBuf;
   while (m1-- > 0) {
     *p++ = Wire.read();
@@ -537,9 +547,9 @@ int BMI088::updateAccQueue(void) {
       {
         BMISample sample;
 
-        sample.x = *p | (*(p+1) << 8);
-        sample.y = *(p+2) | (*(p+3) << 8);
-        sample.z = *(p+4) | (*(p+5) << 8);
+        sample.x = *p     | (int16_t) (*(p+1) << 8);
+        sample.y = *(p+2) | (int16_t) (*(p+3) << 8);
+        sample.z = *(p+4) | (int16_t) (*(p+5) << 8);
 
         m_accQueue.pushBack( sample );
 
@@ -587,10 +597,9 @@ int BMI088::updateGyroQueue(void) {
 
     int n;
     int m, m1;
-    unsigned char ucBuf[128], *p, prefix;
-    char szMessage[100];
+    unsigned char ucBuf[SERIAL_BUFFER_SIZE], *p, prefix;
+    //char szMessage[100];
     BMISample sample;
-
     /*
      * reaad Gyro FIFO
      */
@@ -599,11 +608,20 @@ int BMI088::updateGyroQueue(void) {
     bool bOverflow = getGyroFifoStatus(&ucGyroFrames);
     int nBytes = ucGyroFrames * 6;
 
-    Wire.beginTransmission(BMI088_GYRO_ADDRESS);
+    if (nBytes > SERIAL_BUFFER_SIZE) {
+        Serial.println("warning: Wire buffer too small for available gyro FIFO");
+        delay(5);
+    }
+
+    if (ucGyroFrames == 0) {
+        return m_gyroQueue.size();
+    }
+
+    Wire.beginTransmission(devAddrGyro);
     Wire.write(BMI088_GYRO_FIFO_DATA);
     Wire.endTransmission();
 
-    Wire.requestFrom(BMI088_GYRO_ADDRESS, nBytes);
+    Wire.requestFrom(devAddrGyro, nBytes);
     m = m1 = Wire.available();
     p = ucBuf;
     while (m1-- > 0) {
@@ -618,11 +636,11 @@ int BMI088::updateGyroQueue(void) {
     p = ucBuf;
     for (m1=0; m1<nFrames; m1++) {
 
-        sample.x = *p | (*(p+1) << 8);
-        sample.y = *(p+2) | (*(p+3) << 8);
-        sample.z = *(p+4) | (*(p+5) << 8);
+        sample.x = *p     | (int16_t)  (*(p+1) << 8);
+        sample.y = *(p+2) | (int16_t)  (*(p+3) << 8);
+        sample.z = *(p+4) | (int16_t)  (*(p+5) << 8);
 
-        m_accQueue.pushBack( sample );
+        m_gyroQueue.pushBack( sample );
 
         p+=6;
     }
@@ -683,13 +701,13 @@ bool BMISampleQueue::isFull() const {
     return size() == SAMPLE_QUEUE_SIZE;
 }
 
-int BMISampleQueue::size() const {
-    int n;
+unsigned short BMISampleQueue::size() const {
+    unsigned short n;
     if (m_nBack >= m_nFront) {
-        n = m_nFront - m_nBack;
+        n = m_nBack - m_nFront;
     }
     else {
-        n = (SAMPLE_QUEUE_SIZE - m_nFront) + m_nBack;
+        n = SAMPLE_QUEUE_SIZE - m_nFront + m_nBack;
     }
     return n;
 }
@@ -706,7 +724,7 @@ void BMISampleQueue::pushBack( BMISample &s) {
 BMISample * BMISampleQueue::popFront() {
     BMISample *pResult = NULL;
     if (! isEmpty()) {
-        BMISample *pResult = &m_q[m_nFront++];
+        pResult = &m_q[m_nFront++];
         if (m_nFront == SAMPLE_QUEUE_SIZE) {
             m_nFront = 0;
         }

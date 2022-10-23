@@ -1,6 +1,8 @@
 #ifndef LOGGERCORE_H
 #define LOGGERCORE_H
 
+#define SERIAL_BUFFER_SIZE 512
+
 #include <Arduino.h>
 //#include <Adafruit_DPS310.h>
 //#include <Adafruit_MPU6050.h>
@@ -8,6 +10,7 @@
 #include <Zanshin_BME680.h>
 // Library here: // see https://github.com/bolderflight/bmi088-arduino
 #include "./BMI088.h"
+
 #include <Wire.h>
 //Library here: http://librarymanager/All#SparkFun_u-blox_GNSS
 #include <SparkFun_u-blox_GNSS_Arduino_Library.h> 

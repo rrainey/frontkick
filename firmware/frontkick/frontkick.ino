@@ -11,6 +11,9 @@
  All text above, and the splash screen below must be included in
  any redistribution
 *********************************************************************/
+
+#define SERIAL_BUFFER_SIZE 512
+
 #include <Wire.h>
 #include <bluefruit.h>
 #include <Adafruit_LittleFS.h>

@@ -511,7 +511,7 @@ int BMI088::updateAccQueue(void) {
   int n;
   int m, m1;
   unsigned char ucBuf[128], *p, prefix;
-  char szMessage[100];
+  //char szMessage[100];
 
   n = getAccFifoLength();
 
@@ -588,7 +588,6 @@ int BMI088::updateGyroQueue(void) {
     int n;
     int m, m1;
     unsigned char ucBuf[128], *p, prefix;
-    char szMessage[100];
     BMISample sample;
 
     /*
@@ -622,7 +621,7 @@ int BMI088::updateGyroQueue(void) {
         sample.y = *(p+2) | (*(p+3) << 8);
         sample.z = *(p+4) | (*(p+5) << 8);
 
-        m_accQueue.pushBack( sample );
+        m_gyroQueue.pushBack( sample );
 
         p+=6;
     }
@@ -686,7 +685,7 @@ bool BMISampleQueue::isFull() const {
 int BMISampleQueue::size() const {
     int n;
     if (m_nBack >= m_nFront) {
-        n = m_nFront - m_nBack;
+        n = m_nBack - m_nFront;
     }
     else {
         n = (SAMPLE_QUEUE_SIZE - m_nFront) + m_nBack;
@@ -706,7 +705,7 @@ void BMISampleQueue::pushBack( BMISample &s) {
 BMISample * BMISampleQueue::popFront() {
     BMISample *pResult = NULL;
     if (! isEmpty()) {
-        BMISample *pResult = &m_q[m_nFront++];
+        pResult = &m_q[m_nFront++];
         if (m_nFront == SAMPLE_QUEUE_SIZE) {
             m_nFront = 0;
         }
