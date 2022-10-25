@@ -1,18 +1,18 @@
 # Frontkick
 
 This project is the third in a series of experimental data loggers for skydivers. This is the first in the series to experiment
-with the design for real time guidance under canopy and alternatives for displaying those data.
+with the design of real time guidance under canopy and alternatives for displaying those data.
 
 ## Past projects
 
-* **Sidekick** - first project; based on off-the-shelf Adafruit commponents
+* **Sidekick** - first project; based on off-the-shelf Adafruit components
 * **Dropkick** - second project; custom PCB experiments with two different u-blox receivers (CAM-M8 and SAM-M8). Ultimately the SAM-M8 delivered better overall reception performance.
 
 ## This project
 
-The design is composed of two separate modules.  A sensor pack gathers data.  It uses a Bluetooth interface to send sensor data to the receiving unit.  The receiver logs data. It also does some experimental interpretation of the incoming sensor data and uses that to display guidance and other information on a e-Paper display.
+The design is composed of two separate modules.  A sensor pack gathers data.  It uses a Bluetooth interface to send sensor data to the receiving unit.  The receiver logs data. It also does some experimental interpretation of the incoming sensor data and uses that to display guidance and other information on an e-Paper display.
 
-### Sensor Pack Parts
+### Sensor Pack Components
 
 | Mfr ID      | Manufacturer       | Description |
 |-------------|--------------------|------------------------|
@@ -21,7 +21,8 @@ The design is composed of two separate modules.  A sensor pack gathers data.  It
 |[GPS-00177](https://www.sparkfun.com/products/177)|SparkFun Electronics|Antenna GPS Embedded SMA|
 | [GPS-17285](https://www.sparkfun.com/products/17285)|SparkFun Electronics|GPS Breakout - NEO-M9N, SMA (Qwiic)|
 
-### E-Paper Wrist Display Parts
+### E-Paper Wrist Display Components
+
 | Mfr ID      | Manufacturer       | Description |
 |-------------|--------------------|------------------------|
 |[N/A](hhttps://www.aliexpress.us/item/3256801850594766.html?gatewayAdapt=glo2usa4itemAdapt&_randl_shipto=US) | LilyGo |LILYGO TTGO T5 V2.2 ESP32 2.9" EPaper Plus Module|
@@ -37,3 +38,15 @@ I used some Google fonts in this project. E-paper bitmaps generated from the Goo
 can be found at the [Google Fonts web site](https://developers.google.com/fonts/faq).
 
 The e-paper graphics library required these fonts be in Adafruit GFX format. I used this excellent web-based converter to generate the GFX files from the original Truetype format distribed by Google:  https://rop.nl/truetype2gfx/ 
+
+## Technical References
+[BMI088 Datasheet](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmi088-ds001.pdf)
+
+[Application note: BMI08x FIFO usage](https://www.bosch-sensortec.com/media/boschsensortec/downloads/application_notes_1/bst-mis-an005.pdf)
+
+
+[BME680 Datasheet](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme680-ds001.pdf)
+
+[Adafruit Guide: Feather nRF52840 Express](https://learn.adafruit.com/introducing-the-adafruit-nrf52840-feather)
+
+[u-blox M9N-00B GNSS IC datasheet](https://content.u-blox.com/sites/default/files/NEO-M9N-00B_DataSheet_UBX-19014285.pdf)
