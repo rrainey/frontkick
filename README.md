@@ -10,7 +10,7 @@ with the design of real time guidance under canopy and alternatives for displayi
 
 ## This project
 
-The design is composed of two separate modules.  A sensor pack gathers data.  It uses a Bluetooth interface to send sensor data to the receiving unit.  The receiver logs data. It also does some experimental interpretation of the incoming sensor data and uses that to display guidance and other information on an e-Paper display.
+The design is composed of two separate modules.  A sensor pack gathers data.  It uses a Bluetooth interface to send sensor data to the receiving unit.  The receiver logs data. It also does some experimental interpretation of the incoming sensor data and uses that to display guidance and other information on either an e-Paper or a more traditional TFT LCD display.
 
 ### Sensor Pack Components
 
@@ -25,8 +25,16 @@ The design is composed of two separate modules.  A sensor pack gathers data.  It
 
 | Mfr ID      | Manufacturer       | Description |
 |-------------|--------------------|------------------------|
-|[N/A](hhttps://www.aliexpress.us/item/3256801850594766.html?gatewayAdapt=glo2usa4itemAdapt&_randl_shipto=US) | LilyGo |LILYGO TTGO T5 V2.2 ESP32 2.9" EPaper Plus Module|
+|[N/A](https://www.aliexpress.us/item/3256801850594766.html?gatewayAdapt=glo2usa4itemAdapt&_randl_shipto=US) | LilyGo |LILYGO TTGO T5 V2.2 ESP32 2.9" EPaper Plus Module|
 
+### TFT Wrist Display Components
+| Mfr ID      | Manufacturer       | Description |
+|-------------|--------------------|------------------------|
+|[N/A](http://www.lilygo.cn/prod_view.aspx?TypeId=50053&Id=1380&FId=t3:50053:3) | LilyGo |LILYGO® TTGO T-WATCH 2020 V2 GPS IPS Open Source ESP32 WIFI Bluetooth Capacitive Touch Screen|
+
+Note: currently LilyGo's web site only shows a V3 watch - I am testing using a V2 version of the product. The V2
+version remains listed for sale on the LilyGo sales pages
+on AliExpress and Banggood.
 
 ## Is an e-Paper display suitable for real-time applications?
 
