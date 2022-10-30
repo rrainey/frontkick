@@ -10,7 +10,7 @@ with the design of real time guidance under canopy and alternatives for displayi
 
 ## This project
 
-The design is composed of two separate modules.  A sensor pack gathers data.  It uses a Bluetooth interface to send sensor data to the receiving unit.  The receiver logs data. It also does some experimental interpretation of the incoming sensor data and uses that to display guidance and other information on either an e-Paper or a more traditional TFT LCD display.
+The design is composed of two separate modules.  A sensor pack gathers data.  It uses a Bluetooth interface to send data to the receiving unit.  The receiver logs data. It also does some experimental interpretation of the incoming information and uses that to display guidance and other metrics on either an e-Paper or a more traditional TFT LCD display.
 
 ### Sensor Pack Components
 
