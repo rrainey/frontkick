@@ -26,57 +26,23 @@
  */
 
 #include <BluetoothSerial.h>
-#include <ArduinoJson.h>
 #include <SD.h>
 #include "LogParser.h"
 #include "LogPlayback.h"
 #include "Geodesy.h"
+#include "AppConfig.h"
+
+
+unsigned long g_ulNextGraphicsUpdate_ms = 0;
+unsigned long g_ulTotalUpdateTime_ms = 0;
+unsigned long g_ulPassCount = 0;
+unsigned long g_ulNextStatsUpdate_ms = 0;
+
+#define PERF_UPDATE_INTERVAL_MS 30000
 
 #define GRAPHICS_UPDATE_INTERVAL_MS 300
-unsigned long g_ulNextGraphicsUpdate_ms = 0;
 
 using namespace Geodesy;
-
-struct WiFiNetwork {
-  char ssidName[32];
-  char ssidPassword[32];
-};
-
-bool saveConfigurationToStream(Stream &s);
-bool saveConfigurationToFile(char *pszFilename);
-
-/**
- * Application Settings: stored on the SD Card
- */
-struct AppConfig {
-  char szJumperName[64];
-  char szReplayLogfile[64];
-  int  nLastJumpNumber;
-  char sensorPackName[32];
-  /*
-   * WGS-84 coordinates of landing target
-   */
-  double dTargetLatitude_rad;
-  double dTargetLongitude_rad;
-  double dTargetAltitude_m;
-
-  /*
-   * Normal Canopy performance characteristics for this jumper and main canopy.
-   * TODO: estimate change in performance based on different wing loading
-   *       conditions.
-   */
-  char szCanopyName[64];
-  float fWingLoading;
-  float fForwardDrive_mps;
-  float fDescentRate_mps;
-
-  /*
-   * Wifi Networks the app is authorized to use.
-   * (Wifi not yet used)
-   */
-  int  nWiFiNetworkCount;
-  struct WiFiNetwork *pWifiNetwork;
-};
 
 enum AppMode { 
   appModeStarting,
@@ -87,8 +53,6 @@ enum AppMode {
   };
 
 AppMode g_eAppMode = appModeStarting;
-
-struct AppConfig *g_pAppConfig = NULL;
 
 bool setupSDCard(void);
 #if defined(_HAS_SDCARD_) && !defined(_USE_SHARED_SPI_BUS_)
@@ -153,6 +117,7 @@ char * generateLogname(char *gname, int *pnIndex);
 
 LogPlayback * g_pPlayback;
 LogParser g_logParser;
+AppConfig *g_pAppConfig = NULL;
 SDFile g_playbackFile;
 
 GxIO_Class io(SPI,  EPD_CS, EPD_DC,  EPD_RSET);
@@ -268,7 +233,7 @@ void OnBluetoothDataReceived (const uint8_t *pBuffer, size_t nSize) {
 
     g_eAppMode = appModeLogging;
 
-    generateLogname( logpath, &g_pAppConfig->nLastJumpNumber );
+    generateLogname( logpath, &g_pAppConfig->m_nLastJumpNumber );
     logFile = SD.open( logpath, FILE_WRITE );
 
     //if (! saveConfigurationToFile("/config.txt") ) {
@@ -295,8 +260,6 @@ void OnPlaybackDataReceived(const uint8_t *pBuffer, size_t nSize)
   OnBluetoothDataReceived( pBuffer, nSize );
 }
 
-void partialUpdate();
-
 void partialUpdate()
 {
 #ifdef notdef
@@ -310,10 +273,10 @@ void partialUpdate()
 #endif
   display.drawBitmap(canvas1.getBuffer(), 0, 0, ALT_AREA_WIDTH, ALT_AREA_HEIGHT, GxEPD_WHITE, GxEPD_BLACK);
   display.updateWindow( 0, 0, ALT_AREA_WIDTH, ALT_AREA_HEIGHT, true);
-  display.drawBitmap(canvas2.getBuffer(), SLOPE_AREA_X, 0, SLOPE_AREA_WIDTH, SLOPE_AREA_HEIGHT, GxEPD_WHITE, GxEPD_BLACK);
-  display.updateWindow( SLOPE_AREA_X, 0, SLOPE_AREA_WIDTH-1, SLOPE_AREA_HEIGHT, true);
-  display.drawBitmap(canvas4.getBuffer(), TARGET_GUIDE_X, TARGET_GUIDE_Y, TARGET_GUIDE_SIZE, TARGET_GUIDE_SIZE, GxEPD_WHITE, GxEPD_BLACK);
-  display.updateWindow( TARGET_GUIDE_X, TARGET_GUIDE_Y, TARGET_GUIDE_SIZE, TARGET_GUIDE_SIZE, true);
+  //display.drawBitmap(canvas2.getBuffer(), SLOPE_AREA_X, 0, SLOPE_AREA_WIDTH, SLOPE_AREA_HEIGHT, GxEPD_WHITE, GxEPD_BLACK);
+  //display.updateWindow( SLOPE_AREA_X, 0, SLOPE_AREA_WIDTH-1, SLOPE_AREA_HEIGHT, true);
+  //display.drawBitmap(canvas4.getBuffer(), TARGET_GUIDE_X, TARGET_GUIDE_Y, TARGET_GUIDE_SIZE, TARGET_GUIDE_SIZE, GxEPD_WHITE, GxEPD_BLACK);
+  //display.updateWindow( TARGET_GUIDE_X, TARGET_GUIDE_Y, TARGET_GUIDE_SIZE, TARGET_GUIDE_SIZE, true);
 }
 
 void prepAltitudeDisplay(int nAlt, char * pThousands, char *pHundreds)
@@ -347,8 +310,8 @@ void clearDirtyBoxes()
   }
   */
   canvas1.fillScreen(GxEPD_WHITE);
-  canvas2.fillScreen(GxEPD_WHITE);
-  canvas4.fillScreen(GxEPD_WHITE);
+  //canvas2.fillScreen(GxEPD_WHITE);
+  //canvas4.fillScreen(GxEPD_WHITE);
   dbTop = 0;
 }
 
@@ -411,6 +374,7 @@ void drawTargetGuide(float fHeading_rad, float fDist)
   uint16_t w, h;
   char szDist[6];
   int16_t h_baseline;
+  unsigned long ulUpdateStartTime_ms;
 
   sinH = sin( fHeading_rad );
   cosH = cos( fHeading_rad );
@@ -451,7 +415,6 @@ void drawTargetGuide(float fHeading_rad, float fDist)
     canvas4.print(szDist);
   }
 }
-
 
 void updateDisplay()
 {
@@ -521,6 +484,9 @@ void updateDisplay()
 
     g_ulNextGraphicsUpdate_ms = ulTime_ms + GRAPHICS_UPDATE_INTERVAL_MS;
 
+    g_ulTotalUpdateTime_ms += millis() - ulTime_ms;
+    g_ulPassCount++;
+
   }
 }
 
@@ -547,28 +513,28 @@ void setup(void)
     /*
      * Load application configuration settings from SD card
      */
-    g_pAppConfig = (AppConfig *) malloc(sizeof(AppConfig));
+    g_pAppConfig = new AppConfig();;
 
-    g_pAppConfig->nLastJumpNumber = 0;
-    g_pAppConfig->nWiFiNetworkCount = 0;
-    strcpy(g_pAppConfig->szJumperName, "None");
-    strcpy(g_pAppConfig->szReplayLogfile, "");
-    strcpy(g_pAppConfig->sensorPackName, "");
-    g_pAppConfig->dTargetLatitude_rad = 0.0;
-    g_pAppConfig->dTargetLongitude_rad = 0.0;
-    g_pAppConfig->dTargetAltitude_m = 0;
+    g_pAppConfig->m_nLastJumpNumber = 0;
+    g_pAppConfig->m_nWiFiNetworkCount = 0;
+    strcpy(g_pAppConfig->m_szJumperName, "None");
+    strcpy(g_pAppConfig->m_szReplayLogfile, "");
+    strcpy(g_pAppConfig->m_sensorPackName, "");
+    g_pAppConfig->m_dTargetLatitude_rad = 0.0;
+    g_pAppConfig->m_dTargetLongitude_rad = 0.0;
+    g_pAppConfig->m_dTargetAltitude_m = 0;
 
-    if (loadConfiguration("/config.txt", *g_pAppConfig) ) {
+    if (g_pAppConfig->loadConfiguration("/config.txt") ) {
       Serial.println(F("Configuration settings loaded from SD card"));
     }
     else {
       Serial.println(F("Configuration file not found; using defaults"));
     }
 
-    //saveConfigurationToStream(Serial);
+    //g_pAppConfig->saveConfigurationToStream(Serial);
 
-    if (strlen(g_pAppConfig->sensorPackName) == 0) {
-      strcpy(g_pAppConfig->sensorPackName, pszNname);
+    if (strlen(g_pAppConfig->m_sensorPackName) == 0) {
+      strcpy(g_pAppConfig->m_sensorPackName, pszNname);
     }
 
     Serial.println(F("initializing display"));
@@ -612,6 +578,11 @@ void setup(void)
       while (1) delay(10);
     }
     g_pPlayback = new LogPlayback(g_playbackFile, OnPlaybackDataReceived);
+
+    g_ulNextStatsUpdate_ms = millis() + PERF_UPDATE_INTERVAL_MS;
+
+    g_ulTotalUpdateTime_ms = 0;
+    g_ulPassCount = 0;
 }
 
 void loop()
@@ -628,7 +599,7 @@ void loop()
 
     Serial.println(F("Attempting connection"));
     
-    connected = SerialBT.connect( g_pAppConfig->sensorPackName );
+    connected = SerialBT.connect( g_pAppConfig->m_sensorPackName );
     if (connected) {
       Serial.println(F("Connected succesfully"));
     } 
@@ -655,6 +626,19 @@ void loop()
       g_pPlayback = NULL;
     }
   }
+
+  /*
+   * Display performance metrics
+   */
+  unsigned long ulTime_ms = millis();
+  if (ulTime_ms > g_ulNextStatsUpdate_ms) {
+    char szBuffer[128];
+    g_ulNextStatsUpdate_ms = ulTime_ms + PERF_UPDATE_INTERVAL_MS;
+    sprintf(szBuffer, "Avg display update time: %d ms", (int) (g_ulTotalUpdateTime_ms / g_ulPassCount) );
+    g_ulTotalUpdateTime_ms = 0;
+    g_ulPassCount = 0;
+    Serial.println(szBuffer);
+  }
 }
 
 /**
@@ -671,129 +655,10 @@ bool setupSDCard(void)
     return false;
 }
 
-/**
- * Load application configuration from SD card
- */
-bool loadConfiguration(const char *filename, AppConfig &config) {
-  bool bResult = true;
-  
-  File file = SD.open(filename);
-
-  // Use arduinojson.org/assistant to compute the capacity.
-  DynamicJsonDocument doc(4096);
-
-  DeserializationError err = deserializeJson(doc, file);
-
-  if (err != DeserializationError::Ok) {
-    Serial.print(F("Can't load configuration file:"));
-    Serial.println(err.c_str());
-    return false;
-  }
-
-  config.nLastJumpNumber = doc["lastJump"] | 0;
-  strlcpy(config.szJumperName,   
-          doc["jumperName"] | "Jumper Name",
-          sizeof(config.szJumperName));
-  
-  strlcpy(config.szReplayLogfile,   
-          doc["replayLogfile"] | "",
-          sizeof(config.szReplayLogfile));
-  
-  config.dTargetLatitude_rad = DEGtoRAD( doc["target"]["lat"] | 0.0) ;
-  config.dTargetLongitude_rad = DEGtoRAD( doc["target"]["lon"] | 0.0) ;
-  config.dTargetAltitude_m = doc["target"]["alt_m"] | 0.0 ;
-
-  GeodeticPosition gpTarget;
-  gpTarget.m_latitude_rad = config.dTargetLatitude_rad;
-  gpTarget.m_longitude_rad = config.dTargetLongitude_rad;
-  gpTarget.m_altitude_meters = config.dTargetAltitude_m;
-
-  g_logParser.SetLandingTarget( gpTarget );
-
-  strlcpy(config.szCanopyName,
-          doc["canopyPerformance"]["name"]  | "",
-          sizeof(config.szCanopyName));
-  config.fWingLoading = doc["canopyPerformance"]["wingLoading"] | 0.0f;
-  config.fForwardDrive_mps = doc["canopyPerformance"]["forwardDrive_mps"] | 10.0f;
-  config.fDescentRate_mps = doc["canopyPerformance"]["descentRate_mps"] | 5.5f;
-
-  JsonArray wifi = doc["wifi"];
-  config.nWiFiNetworkCount = wifi.size();
-  config.pWifiNetwork = (WiFiNetwork*) malloc(sizeof(WiFiNetwork) * config.nWiFiNetworkCount);
-  /*
-   * copy network info
-   */
-
-  int i;
-  for(i=0; i<config.nWiFiNetworkCount; ++i) {
-    const char * pSsid = doc["wifi"][i]["ssid"].as<const char*>();
-    const char * pPassword = doc["wifi"][i]["password"].as<const char*>();
-
-    strcpy( config.pWifiNetwork[i].ssidName, "" );
-    strcpy( config.pWifiNetwork[i].ssidPassword, "" );
-
-    if (pSsid) {
-      strlcpy(config.pWifiNetwork[i].ssidName,   
-          pSsid,
-          sizeof(config.pWifiNetwork[i].ssidName));
-    }
-    if (pPassword) {
-      strlcpy(config.pWifiNetwork[i].ssidPassword,   
-          pPassword,
-          sizeof(config.pWifiNetwork[i].ssidPassword));
-    }
-  }
-
-  file.close();
-
-  return bResult;
-}
-
-bool saveConfigurationToFile(const char * pszFilename)
-{
-  File file = SD.open(pszFilename, FILE_WRITE);
-  bool bResult= saveConfigurationToStream(file);
-  file.close();
-  return bResult;
-}
-
-bool saveConfigurationToStream(Stream &s)
-{
-  DynamicJsonDocument doc(4096);
-  int i;
-
-  JsonObject root = doc.to<JsonObject>();
-
-  root["jumperName"] = g_pAppConfig->szJumperName;
-  root["replayLogfile"] = g_pAppConfig->szReplayLogfile;
-  root["lastJump"] = g_pAppConfig->nLastJumpNumber;
-
-  if (g_pAppConfig->dTargetLatitude_rad != 0.0) {
-    JsonObject tobject = doc.createNestedObject("target");
-    tobject["lat"] = RADtoDEG(g_pAppConfig->dTargetLatitude_rad);
-    tobject["lon"] = RADtoDEG(g_pAppConfig->dTargetLongitude_rad);
-    tobject["alt_m"] = RADtoDEG(g_pAppConfig->dTargetAltitude_m);
-    //root["target"] = tobject;
-  }
-
-  JsonObject cobject = doc.createNestedObject("canopyPerformance");
-  cobject["name"] = g_pAppConfig->szCanopyName;
-  cobject["forwardDrive_mps"] = g_pAppConfig->fForwardDrive_mps;
-  cobject["descentRate_mps"] = g_pAppConfig->fDescentRate_mps;
-  cobject["wingLoading"] = g_pAppConfig->fWingLoading;
-  //root["canopyPerformance"] = cobject;
-
-  JsonArray wifiArray = doc.createNestedArray("wifi");
-  for(i=0; i<g_pAppConfig->nWiFiNetworkCount; ++i) {
-    JsonObject object = wifiArray.createNestedObject();
-    object["ssid"] = g_pAppConfig->pWifiNetwork[i].ssidName;
-    object["password"] = g_pAppConfig->pWifiNetwork[i].ssidPassword;
-    //wifiArray.add(object);
-  }
-  //root["wifi"] = wifiArray;
-  serializeJson(doc, s);
-}
-
+/// @brief Generate a unique filename based on existing filenames already present on the SD card
+/// @param gname buffer to hold generated name
+/// @param pnIndex integer index to start the search at
+/// @return buffer containing generated filename (gname)
 char * generateLogname(char *gname, int *pnIndex)
 {
   char * result = NULL;
